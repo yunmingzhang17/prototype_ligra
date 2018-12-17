@@ -102,6 +102,10 @@ void Compute(graph<vertex>& GA, commandLine P) {
     }
     if(Frontier.numNonzeros() == 0) { largestCore = k-1; break; }
   }
+
+  //  for (int i = 0; i < n; i++){
+  //  cout << "node: " << i << " core: " << coreNumbers[i] << endl;
+  //}
   cout << "largestCore was " << largestCore << endl;
   Frontier.del(); free(coreNumbers); free(Degrees);
 }
