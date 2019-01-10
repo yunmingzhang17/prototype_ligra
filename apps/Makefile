@@ -22,7 +22,7 @@ ifdef LOWMEM
 MEM = -DLOWMEM
 endif
 
-CUSTOM_CILK=1
+#CUSTOM_CILK=1
 
 #compilers
 ifdef CILK
