@@ -41,7 +41,7 @@ struct Visit_F {
 };
 
 template <class vertex>
-void DeltaStepping(graph<vertex>& G, uintE src, uintE delta, size_t num_buckets=128) {
+array_imap<uintE> DeltaStepping(graph<vertex>& G, uintE src, uintE delta, size_t num_buckets=128) {
   auto V = G.V; size_t n = G.n, m = G.m;
   auto dists = array_imap<uintE>(n, [&] (size_t i) { return INT_E_MAX; });
   dists[src] = 0;
@@ -63,6 +63,7 @@ void DeltaStepping(graph<vertex>& G, uintE src, uintE delta, size_t num_buckets=
   };
 
   auto bkt = b.next_bucket();
+  int iter = 0;
   while (bkt.id != b.null_bkt) {
     auto active = bkt.identifiers;
     // The output of the edgeMap is a vertexSubsetData<uintE> where the value
@@ -76,12 +77,74 @@ void DeltaStepping(graph<vertex>& G, uintE src, uintE delta, size_t num_buckets=
     }
     res.del(); active.del();
     bkt = b.next_bucket();
+    iter++;
   }
+
+  cout << "delta stepping iter count: " << iter << endl;
+  return dists;
+
+}
+
+
+// Point to Point distance delta stepping
+template <class vertex>
+array_imap<uintE> PPDeltaStepping(graph<vertex>& G, uintE src, uintE dst,
+				  uintE delta, size_t num_buckets=128) {
+  auto V = G.V; size_t n = G.n, m = G.m;
+  auto dists = array_imap<uintE>(n, [&] (size_t i) { return INT_E_MAX; });
+  dists[src] = 0;
+
+  auto get_bkt = [&] (const uintE& dist) -> const uintE {
+    return (dist == INT_E_MAX) ? UINT_E_MAX : (dist / delta); };
+  auto get_ring = [&] (const size_t& v) -> const uintE {
+    auto d = dists[v];
+    return (d == INT_E_MAX) ? UINT_E_MAX : (d / delta); };
+  auto b = make_buckets(n, get_ring, increasing, num_buckets);
+
+  auto apply_f = [&] (const uintE v, uintE& oldDist) -> void {
+    uintE newDist = dists.s[v] & VAL_MASK;
+    dists.s[v] = newDist; // Remove the TOP_BIT in the distance.
+    // Compute the previous bucket and new bucket for the vertex.
+    uintE prev_bkt = get_bkt(oldDist), new_bkt = get_bkt(newDist);
+    bucket_dest dest = b.get_bucket(prev_bkt, new_bkt);
+    oldDist = dest; // write back
+  };
+
+  auto bkt = b.next_bucket();
+  int iter = 0;
+  while (bkt.id != b.null_bkt) {
+    auto active = bkt.identifiers;
+    // The output of the edgeMap is a vertexSubsetData<uintE> where the value
+    // stored with each vertex is its original distance in this round
+    auto res = edgeMapData<uintE>(G, active, Visit_F(dists), G.m/20, sparse_no_filter | dense_forward);
+    vertexMap(res, apply_f);
+    if (res.dense()) {
+      b.update_buckets(res.get_fn_repr(), n);
+    } else {
+      b.update_buckets(res.get_fn_repr(), res.size());
+    }
+    res.del(); active.del();
+    bkt = b.next_bucket();
+
+    // destination should have been reached
+    // shortest distance found
+    if (bkt.id > dists[dst]){
+      cout << "PP delta stepping iter count: " << iter << endl;
+      break;
+    }
+    
+    iter++;
+  }
+
+  return dists;
+
 }
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+
   uintE src = P.getOptionLongValue("-src",0);
+  uintE dst = P.getOptionLongValue("-dst", 1);
   uintE delta = P.getOptionLongValue("-delta",1);
   size_t num_buckets = P.getOptionLongValue("-nb", 128);
   if (num_buckets != (1 << pbbs::log2_up(num_buckets))) {
@@ -95,5 +158,14 @@ void Compute(graph<vertex>& GA, commandLine P) {
   cout << "### n: " << GA.n << endl;
   cout << "### m: " << GA.m << endl;
   cout << "### delta = " << delta << endl;
-  DeltaStepping(GA, src, delta, num_buckets);
+
+  auto oracle_dist = DeltaStepping(GA, src, delta, num_buckets);
+  auto pp_dist = PPDeltaStepping(GA, src, dst, delta, num_buckets);
+  
+  if (oracle_dist[dst] == pp_dist[dst]){
+    cout << "Pass" << endl;
+  } else {
+    cout << "Fail, PP dist: " << pp_dist[dst] << " actual dist: " << oracle_dist[dst] << endl;
+  }
+
 }
