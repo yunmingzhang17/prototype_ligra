@@ -128,7 +128,7 @@ array_imap<uintE> PPDeltaStepping(graph<vertex>& G, uintE src, uintE dst,
 
     // destination should have been reached
     // shortest distance found
-    if (bkt.id > dists[dst]){
+    if (bkt.id > dists[dst]/delta){
       cout << "PP delta stepping iter count: " << iter << endl;
       break;
     }
@@ -146,6 +146,10 @@ void Compute(graph<vertex>& GA, commandLine P) {
   uintE src = P.getOptionLongValue("-src",0);
   uintE dst = P.getOptionLongValue("-dst", 1);
   uintE delta = P.getOptionLongValue("-delta",1);
+  
+  bool verification = P.getOptionValue("-v");
+
+
   size_t num_buckets = P.getOptionLongValue("-nb", 128);
   if (num_buckets != (1 << pbbs::log2_up(num_buckets))) {
     cout << "Please specify a number of buckets that is a power of two" << endl;
@@ -159,13 +163,16 @@ void Compute(graph<vertex>& GA, commandLine P) {
   cout << "### m: " << GA.m << endl;
   cout << "### delta = " << delta << endl;
 
-  auto oracle_dist = DeltaStepping(GA, src, delta, num_buckets);
-  auto pp_dist = PPDeltaStepping(GA, src, dst, delta, num_buckets);
-  
-  if (oracle_dist[dst] == pp_dist[dst]){
-    cout << "Pass" << endl;
-  } else {
-    cout << "Fail, PP dist: " << pp_dist[dst] << " actual dist: " << oracle_dist[dst] << endl;
-  }
+  cout << "degree of src: " << GA.V[src].getOutDegree() << endl;
+  cout << "degree of dst: " << GA.V[dst].getOutDegree() << endl;
 
+  auto pp_dist = PPDeltaStepping(GA, src, dst, delta, num_buckets);
+  if (verification){
+    auto oracle_dist = DeltaStepping(GA, src, delta, num_buckets);
+    if (oracle_dist[dst] == pp_dist[dst]){
+      cout << "Pass" << endl;
+    } else {
+      cout << "Fail, PP dist: " << pp_dist[dst] << " actual dist: " << oracle_dist[dst] << endl;
+    }
+  }
 }
