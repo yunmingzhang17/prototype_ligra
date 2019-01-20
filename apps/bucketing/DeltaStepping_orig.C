@@ -7,8 +7,6 @@
 constexpr uintE TOP_BIT = ((uintE)INT_E_MAX) + 1;
 constexpr uintE VAL_MASK = INT_E_MAX;
 
-#define TIMER
-
 struct Visit_F {
   array_imap<uintE> dists;
   Visit_F(array_imap<uintE>& _dists) : dists(_dists) { }
@@ -66,30 +64,12 @@ void DeltaStepping(graph<vertex>& G, uintE src, uintE delta, size_t num_buckets=
 
   int rounds = 0;
 
-  #ifdef TIMER
-  
-  timer t1;
-  timer t2;
-
-  #endif
-
   auto bkt = b.next_bucket();
   while (bkt.id != b.null_bkt) {
     auto active = bkt.identifiers;
     // The output of the edgeMap is a vertexSubsetData<uintE> where the value
     // stored with each vertex is its original distance in this round
-
-#ifdef TIMER
-    t1.start();
-#endif
-
     auto res = edgeMapData<uintE>(G, active, Visit_F(dists), G.m/20, sparse_no_filter | dense_forward);
-
-#ifdef TIMER
-    t1.stop();
-    t2.start();
-#endif
-
     vertexMap(res, apply_f);
     if (res.dense()) {
       b.update_buckets(res.get_fn_repr(), n);
@@ -98,18 +78,9 @@ void DeltaStepping(graph<vertex>& G, uintE src, uintE delta, size_t num_buckets=
     }
     res.del(); active.del();
     bkt = b.next_bucket();
-
-#ifdef TIMER
-    t2.stop();
-#endif
-
     rounds++;
   }
 
-#ifdef TIMER
-  t1.reportTotal("Edge update time: ");
-  t2.reportTotal("Bucket update and get new bucket time: ");
-#endif
 
   cout << "took " << rounds << " rounds " << endl;
 
